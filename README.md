@@ -113,6 +113,10 @@ gaussian_blur(5×5)
 ↳ ONNX Runtime (sigmoid) → logits
 threshold(logits, 0.5)
 connected_components()   
+
+https://github.com/user-attachments/assets/4bab78df-7bdd-430b-9e05-a8473a87ec87
+
+
 ```
 
 
@@ -120,8 +124,7 @@ GPU vs CPU is runtime-selectable by appending or omitting the CUDA EP when the *
 
 #### 📹 Demo video
 
-https://github.com/kderoodt/viscon-assignment/blob/main/rail_overlay.mp4
-
+https://github.com/user-attachments/assets/a0ca3169-3431-446a-8d1a-679908a3250b
 
 
 ### 6.2  Q 2 – Row counting
@@ -139,7 +142,8 @@ Outputs:
 
 ### 6.3  Q 3 – Testing & validation plan
 
-## 7  Launch-file cheatsheet
+## 7  Launch-file 
+
 From *launch/rail_detector_launch.py*:
 
 | Argument | Default | Meaning |
