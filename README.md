@@ -113,13 +113,13 @@ source install/setup.bash
 The ```CMakeLists.txt``` provided in the assignment links OpenCV, ONNX Runtime (CPU + CUDA) and registers **`row_counter_node`** both as a component library *and* a standalone executable.
 
 ## 5  Run instructions
-### 5.1  All-in-one launch
+### All-in-one launch
 ```bash
 ros2 launch rail_detector rail_detector_launch.py     use_row_counter:=true     use_rqt:=true     use_gpu:=true        
 ```
 Default values are **`use_row_counter=true`**, **`use_rqt=true`**, **`use_gpu=true`**.
 
-### 5.2  Headless / CPU-only example
+### Headless / CPU-only example
 ```bash
 ros2 launch rail_detector rail_detector_launch.py     use_rqt:=false use_gpu:=false
 ```
@@ -127,7 +127,7 @@ ros2 launch rail_detector rail_detector_launch.py     use_rqt:=false use_gpu:=fa
 ## 6  Detailed solution per assignment question
 
 
-### 6.1  Q 1 – Row detection
+### Q 1 – Row detection
 The **`rail_detector_node`** subscribes to the infra-red image, applies classical CV pre-processing, forwards the 768 × 720 crop through an ONNX segmentation network, and finally publishes a binary mask and colour overlay.
 
 Pipeline:
@@ -154,7 +154,7 @@ GPU vs CPU is runtime-selectable by appending or omitting the CUDA EP when the *
 https://github.com/user-attachments/assets/a0ca3169-3431-446a-8d1a-679908a3250b
 
 
-### 6.2  Q 2 – Row counting
+### Q 2 – Row counting
 The **`row_counter_node`** listens to the binary mask and odometry:
 * Keep only blobs below *roi_y_ratio* (default 0.5 × image height) and larger than *min_area_px* ✕ px.  
 * A state-machine detects the rising edge when a new rail enters the view; possible re-entries are debounced via *min_overlap_px*.
@@ -166,7 +166,7 @@ Outputs:
 * Console log – human readable summary.
 
 
-### 6.3  Q 3 – Testing & validation plan
+### Q 3 – Testing & validation plan
 
 ## 7  Launch-file 
 

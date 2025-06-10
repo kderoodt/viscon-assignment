@@ -9,9 +9,9 @@ RowCounterNode::RowCounterNode()
 RowCounterNode::RowCounterNode(const rclcpp::NodeOptions & options)
 : Node("row_counter", options)
 {
-  row_spacing_     = declare_parameter("row_spacing",     1.00);  
-  min_area_px_     = declare_parameter("min_area_px",     1000);
-  roi_y_ratio_     = declare_parameter("roi_y_ratio",     0.5);   
+  row_spacing_     = declare_parameter("row_spacing",     0.50);  
+  min_area_px_     = declare_parameter("min_area_px",     2000);
+  roi_y_ratio_     = declare_parameter("roi_y_ratio",     0.6);   
   min_overlap_px_  = declare_parameter("min_overlap_px",  500);
 
   sub_mask_ = create_subscription<sensor_msgs::msg::Image>(
@@ -36,14 +36,12 @@ void RowCounterNode::odomCallback(
 void RowCounterNode::maskCallback(
     const sensor_msgs::msg::Image::ConstSharedPtr& msg)
 {
-
   cv::Mat mask = cv_bridge::toCvCopy(msg, msg->encoding)->image;
 
   cv::Rect bb;
   bool rail_found = findNearestRailBlob(mask, bb);
 
-
-  if (!active_rail_ && rail_found)            
+  if (!active_rail_ && rail_found)          
   {
     active_bb_  = bb;
     active_rail_ = true;
@@ -53,7 +51,7 @@ void RowCounterNode::maskCallback(
   {
     int overlap = rail_found ? (bb & active_bb_).area() : 0;
     if (overlap < min_overlap_px_)
-      active_rail_ = false;         
+      active_rail_ = false;              
   }
 }
 
@@ -68,7 +66,7 @@ bool RowCounterNode::findNearestRailBlob(const cv::Mat& mask,
   int img_h = mask.rows;
   int roi_y = static_cast<int>(roi_y_ratio_ * img_h);
 
-  for (int i = 1; i < n; ++i)   // 0 = background
+  for (int i = 1; i < n; ++i) 
   {
     int area   = stats.at<int>(i, cv::CC_STAT_AREA);
     int top    = stats.at<int>(i, cv::CC_STAT_TOP);
@@ -77,7 +75,7 @@ bool RowCounterNode::findNearestRailBlob(const cv::Mat& mask,
 
     if (area < min_area_px_ || bottom < roi_y) continue;
 
-    double score = bottom + 0.01 * area; 
+    double score = bottom + 0.01 * area;   
     if (score > best_score)
     {
       best_score = score;

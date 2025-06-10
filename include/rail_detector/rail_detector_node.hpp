@@ -17,7 +17,7 @@ public:
 private:
     void imageCallback(const sensor_msgs::msg::Image::ConstSharedPtr& msg);
 
-    int min_area_px_{1000};
+    int min_area_px_{500};
     
     image_transport::Subscriber sub_;
     image_transport::Publisher pub_preprocessed_;
