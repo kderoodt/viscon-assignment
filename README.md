@@ -1,6 +1,14 @@
 # Rail Detector & Row Counter  
 **Greenhouse localisation for the Viscon Operational Robotics Engineer Assignment**
 
+A ROS 2 C++ package that
+
+* Detects greenhouse heating rails in the infrared stream of an Intel RealSense D456 (Q1)
+
+* Counts the rows the robot has passed using the rail detections & odometry (Q2)
+
+The package is self‑contained and reproducible in ≤ 10 minutes on a fresh ROS 2 Jenny install.
+
 ---
 
 ## Table of Contents
@@ -48,25 +56,43 @@ rail_detector/
 └── README.md
 ```
 
-## 3  Prerequisites
-* **OS** Ubuntu 24.04 LTS (tested)  
-* **ROS 2** Humble Hawksbill (desktop-full)  
-* **CUDA-capable GPU** *(optional)* Compute ≥ 6.1, CUDA 11.8  
-* **ONNX Runtime 1.17+** built **with** or **without** CUDA EP  
-* **C/C++ 17 tool-chain** (gcc 11), CMake ≥ 3.16  
-* Python 3.10 (for rosbag / evaluation helpers)
+## 3  Dependencies
 
-<details><summary>One-liner to get the system packages</summary>
+> Tested on Ubuntu 24.04 + ROS 2 Jazzy 
+
+* **OS** Ubuntu 24.04 LTS 
+* **ROS 2** Jazzy Jalisco 
+* **CUDA-capable GPU**  *(optional)* 
+* **ONNX Runtime 1.17+** built **with** or **without** CUDA EP  
+
+### ROS 2 & system packages
 
 ```bash
-sudo apt update && sudo apt install -y   build-essential cmake git curl   ros-humble-desktop   python3-colcon-common-extensions   python3-pip python3-vcstool   libopencv-dev ros-humble-cv-bridge   ros-humble-image-transport ros-humble-rqt-image-view   ros-humble-nav-msgs ros-humble-ament-cmake   onnxruntime libonnxruntime-dev
+sudo apt update && sudo apt install -y \
+  build-essential cmake git curl \
+  ros-jazzy-desktop python3-colcon-common-extensions \
+  ros-jazzy-image-transport ros-jazzy-rqt-image-view \
+  ros-jazzy-cv-bridge ros-jazzy-ament-index-cpp \
+  ros-jazzy-rclcpp ros-jazzy-rclcpp-components \
+  ros-jazzy-sensor-msgs ros-jazzy-nav-msgs ros-jazzy-std-msgs \
+  libopencv-dev
 ```
 
-</details>
+### ONNX Runtime (GPU)
+
+> **Note:** This step is not needed if run using CPU, this process can take up to 10 min. Build ORT 1.18 with CUDA 12 takes ≈10 min:
+
+>```bash
+>mkdir -p ~/onnxruntime && cd ~/onnxruntime
+> 
+>./build.sh --config Release --update --parallel --build --use_cuda >--cuda_home /usr/local/cuda --cudnn_home /usr/local/cuda >--skip_tests
+>
+>```
 
 > **Note:** if you compiled ONNX Runtime yourself, export the root before building the workspace:
+
 > ```bash
-> export ONNXRUNTIME_ROOT=$HOME/onnxruntime  # where include/ and libonnxruntime.so live
+> export ONNXRUNTIME_ROOT=$HOME/onnxruntime  
 > ```
 
 ## 4  Build instructions
@@ -79,7 +105,7 @@ git clone https://github.com/kderoodt/viscon-assignment.git rail_detector
 
 # 3. build
 cd ~/ros2_ws
-colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+colcon build --packages-select rail_detector
 
 # 4. source overlay (every new shell)
 source install/setup.bash
@@ -104,20 +130,21 @@ ros2 launch rail_detector rail_detector_launch.py     use_rqt:=false use_gpu:=fa
 ### 6.1  Q 1 – Row detection
 The **`rail_detector_node`** subscribes to the infra-red image, applies classical CV pre-processing, forwards the 768 × 720 crop through an ONNX segmentation network, and finally publishes a binary mask and colour overlay.
 
-Pipeline (pseudo-code):
-```
-rotate 90° CW            
-crop lower 60 %          
-clahe(clip=4.0)          
-gaussian_blur(5×5)
-↳ ONNX Runtime (sigmoid) → logits
-threshold(logits, 0.5)
-connected_components()   
+Pipeline:
 
-https://github.com/user-attachments/assets/4bab78df-7bdd-430b-9e05-a8473a87ec87
+* Pre-processing the image 
+    * Rotate image 90° CW            
+    * Crop lower 60 %          
+    * Enhances local contrast - Clahe(clip=4.0)          
+    * Suppresses noise - Gaussian_blur(5×5)
+* Using trained ONNX Runtime model for detection prediction
+* Post-processing  
+    * Only keep large blobs  
 
-
-```
+Outputs:
+* Topic `/rail_detector/preprocessed` – 720 × 768 mono8 pre‑processed framedetections.
+* Topic `/rail_mask` – Binary mask (0/255).
+* Topic `/rail_detector/overlay` – BGR stream with red rail overlay.
 
 
 GPU vs CPU is runtime-selectable by appending or omitting the CUDA EP when the **`use_gpu`** parameter is set.
@@ -129,15 +156,14 @@ https://github.com/user-attachments/assets/a0ca3169-3431-446a-8d1a-679908a3250b
 
 ### 6.2  Q 2 – Row counting
 The **`row_counter_node`** listens to the binary mask and odometry:
-1. Keep only blobs below *roi_y_ratio* (default 0.5 × image height) and larger than *min_area_px* ✕ px.  
-2. A tiny state-machine detects the rising edge when a new rail enters the view; possible re-entries are debounced via *min_overlap_px*.
-3. The `(x,y)` odom pose at each detection is compared to the last counted pose.  
+* Keep only blobs below *roi_y_ratio* (default 0.5 × image height) and larger than *min_area_px* ✕ px.  
+* A state-machine detects the rising edge when a new rail enters the view; possible re-entries are debounced via *min_overlap_px*.
+* The `(x,y)` odom pose at each detection is compared to the last counted pose.  
    If the Euclidean distance ≥ *row_spacing* (default 1 m) we increment `row_count_` and publish it.
 
 Outputs:
 * Topic `rows_count` – live counter for other nodes.
 * Console log – human readable summary.
-* Optional YAML log: `ros2 bag record /rows_count`  → post-processed into *results.yaml*.
 
 
 ### 6.3  Q 3 – Testing & validation plan
