@@ -1,0 +1,12 @@
+# --- colcon / ROS2 -------------------------------------------------
+build/
+install/
+log/
+.vscode/
+
+# --- general C++ artefacts ----------------------------------------
+*.o
+*.so
+*.a
+*.swp
+.DS_Store
