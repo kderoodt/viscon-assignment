@@ -119,11 +119,9 @@ connected_components()
 GPU vs CPU is runtime-selectable by appending or omitting the CUDA EP when the **`use_gpu`** parameter is set.
 
 #### 📹 Demo video
-Include a short clip showing the red rail overlay:
-```markdown
+
 https://github.com/kderoodt/viscon-assignment/blob/main/rail_overlay.mp4
-<!-- ![Row detection demo](/rail_overlay.mp4) -->
-```
+
 
 
 ### 6.2  Q 2 – Row counting
