@@ -121,7 +121,8 @@ GPU vs CPU is runtime-selectable by appending or omitting the CUDA EP when the *
 #### 📹 Demo video
 Include a short clip showing the red rail overlay:
 ```markdown
-![Row detection demo](/rail_overlay.mp4)
+https://github.com/kderoodt/viscon-assignment/blob/main/rail_overlay.mp4
+<!-- ![Row detection demo](/rail_overlay.mp4) -->
 ```
 
 
