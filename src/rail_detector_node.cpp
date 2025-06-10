@@ -10,17 +10,26 @@ RailDetectorNode::RailDetectorNode()
   session_(nullptr)
 {
   min_area_px_ = this->declare_parameter<int>("min_area", 1000);
+  bool use_gpu  = this->declare_parameter<bool>("use_gpu", true);
 
   session_options_.SetIntraOpNumThreads(1);
-  session_options_.SetGraphOptimizationLevel(
-      GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
+  session_options_.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
 
-  OrtCUDAProviderOptions cuda_opts{};
-  cuda_opts.device_id                 = 0;
-  cuda_opts.gpu_mem_limit             = SIZE_MAX;
-  cuda_opts.cudnn_conv_algo_search    = OrtCudnnConvAlgoSearchExhaustive;
-  cuda_opts.do_copy_in_default_stream = 1;
-  session_options_.AppendExecutionProvider_CUDA(cuda_opts);
+  // OrtCUDAProviderOptions cuda_opts{};
+  // cuda_opts.device_id                 = 0;
+  // cuda_opts.gpu_mem_limit             = SIZE_MAX;
+  // cuda_opts.cudnn_conv_algo_search    = OrtCudnnConvAlgoSearchExhaustive;
+  // cuda_opts.do_copy_in_default_stream = 1;
+  // session_options_.AppendExecutionProvider_CUDA(cuda_opts);
+
+    if (use_gpu) {                     
+    OrtCUDAProviderOptions cuda_opts{};
+    cuda_opts.device_id                 = 0;
+    cuda_opts.gpu_mem_limit             = SIZE_MAX;
+    cuda_opts.cudnn_conv_algo_search    = OrtCudnnConvAlgoSearchExhaustive;
+    cuda_opts.do_copy_in_default_stream = 1;
+    session_options_.AppendExecutionProvider_CUDA(cuda_opts);
+  }
 
   std::string model_path =
       declare_parameter<std::string>("model_path",

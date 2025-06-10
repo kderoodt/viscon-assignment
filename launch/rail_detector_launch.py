@@ -17,9 +17,15 @@ def generate_launch_description():
         'use_rqt',
         default_value='true',
         description='Start rqt_image_view for live preview')
+    
+    use_gpu_arg = DeclareLaunchArgument(
+    'use_gpu',
+    default_value='true',
+    description='Run inference on the GPU (CUDA) if true, CPU if false')
 
     use_row_counter = LaunchConfiguration('use_row_counter')
     use_rqt         = LaunchConfiguration('use_rqt')
+    use_gpu = LaunchConfiguration('use_gpu')
 
     model_path = PathJoinSubstitution([
         FindPackageShare('rail_detector'),
@@ -34,6 +40,7 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'model_path': model_path,
+            'use_gpu':    use_gpu
         }]
     )
 
@@ -63,6 +70,7 @@ def generate_launch_description():
     return LaunchDescription([
         use_row_counter_arg,
         use_rqt_arg,
+        use_gpu_arg,
         detector_node,
         row_counter_node,
         rqt_view
