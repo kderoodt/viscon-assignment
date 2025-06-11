@@ -9,7 +9,7 @@ RailDetectorNode::RailDetectorNode()
   session_options_(),
   session_(nullptr)
 {
-  min_area_px_ = this->declare_parameter<int>("min_area", 500);
+  min_area_px_ = this->declare_parameter<int>("min_area", 800);
   bool use_gpu  = this->declare_parameter<bool>("use_gpu", true);
 
   session_options_.SetIntraOpNumThreads(1);

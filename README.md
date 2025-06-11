@@ -8,6 +8,9 @@ A ROS 2 C++ package that:
 
 The package is self‑contained and reproducible in ≤ 10 minutes on a fresh ROS 2 Jazzy install.
 
+The repository also contains a 'training' folder. This folder contains files and data for training the U-NET ONNX model. 
+> A trained ONNX model is provided in 'rail_detector/models'. So, no training is needed!
+
 ---
 
 ## Table of Contents
@@ -85,7 +88,7 @@ sudo apt update && sudo apt install -y \
 sudo apt install libonnxruntime-dev       # small CPU‑only library
 ```
 
-**GPU build (optional but way faster):**
+**GPU build (optional but 5-10min):**
 
 ```bash
 git clone --recursive https://github.com/microsoft/onnxruntime
@@ -128,6 +131,11 @@ ros2 launch rail_detector rail_detector_launch.py     use_row_counter:=true     
 ### Headless / CPU-only
 ```bash
 ros2 launch rail_detector rail_detector_launch.py     use_rqt:=false use_gpu:=false
+```
+
+## Play Viscon rosbag
+```bash
+ros2 bag play ~/rosbags/viscon
 ```
 
 ---
@@ -180,7 +188,7 @@ The `row_counter_node` implements a robust debounced row counter:
 
 - Input: binary mask + `/odometry/filtered`
 - Filters:
-  - Ignore blobs above ROI Y (default: lower 50%)
+  - Ignore blobs above ROI Y (default: lower 60%)
   - Ignore area < min_area_px
   - Compare current pose with last counted rail
 - Increment count if distance ≥ row_spacing (0.5 m)

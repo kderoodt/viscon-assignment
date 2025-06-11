@@ -50,10 +50,10 @@ def generate_launch_description():
         name='row_counter_node',
         output='screen',
         parameters=[{
-            'row_spacing':     0.50,
-            'min_area_px':     2000,
-            'roi_y_ratio':     0.6,
-            'min_overlap_px':  500
+            'row_spacing':     0.60,
+            'min_area_px':     1000,
+            'roi_y_ratio':     0.2,
+            'min_overlap_px':  200, # 750
         }],
         condition=IfCondition(use_row_counter)           
     )

@@ -9,10 +9,10 @@ RowCounterNode::RowCounterNode()
 RowCounterNode::RowCounterNode(const rclcpp::NodeOptions & options)
 : Node("row_counter", options)
 {
-  row_spacing_     = declare_parameter("row_spacing",     0.50);  
-  min_area_px_     = declare_parameter("min_area_px",     2000);
-  roi_y_ratio_     = declare_parameter("roi_y_ratio",     0.6);   
-  min_overlap_px_  = declare_parameter("min_overlap_px",  500);
+  row_spacing_     = declare_parameter("row_spacing",     0.60);  
+  min_area_px_     = declare_parameter("min_area_px",     1000);
+  roi_y_ratio_     = declare_parameter("roi_y_ratio",     0.2);   
+  min_overlap_px_  = declare_parameter("min_overlap_px",  200); // 750
 
   sub_mask_ = create_subscription<sensor_msgs::msg::Image>(
       "/rail_mask", rclcpp::SensorDataQoS(),
@@ -50,7 +50,10 @@ void RowCounterNode::maskCallback(
   else if (active_rail_)
   {
     int overlap = rail_found ? (bb & active_bb_).area() : 0;
+    int overlap_width = (bb & active_bb_).width;
+
     if (overlap < min_overlap_px_)
+    // if (overlap < min_overlap_px_ && overlap_width > 50)
       active_rail_ = false;              
   }
 }
@@ -62,9 +65,11 @@ bool RowCounterNode::findNearestRailBlob(const cv::Mat& mask,
   int n = cv::connectedComponentsWithStats(mask, labels,
                                            stats, centroids, 8, CV_32S);
 
-  double best_score = -1;
+  double best_score = -1e9;
   int img_h = mask.rows;
+  int img_w = mask.cols;
   int roi_y = static_cast<int>(roi_y_ratio_ * img_h);
+  int center_x = img_w / 2;
 
   for (int i = 1; i < n; ++i) 
   {
@@ -75,17 +80,26 @@ bool RowCounterNode::findNearestRailBlob(const cv::Mat& mask,
 
     if (area < min_area_px_ || bottom < roi_y) continue;
 
-    double score = bottom + 0.01 * area;   
+    // double score = bottom; // + 0.01 * area;   
+
+    int left   = stats.at<int>(i, cv::CC_STAT_LEFT);
+    int width  = stats.at<int>(i, cv::CC_STAT_WIDTH);
+    int blob_cx = left + width / 2;
+
+    double dist_to_center_x = std::abs(blob_cx - center_x);
+    double score = -dist_to_center_x;
+
     if (score > best_score)
     {
       best_score = score;
-      out_bb = cv::Rect(stats.at<int>(i, cv::CC_STAT_LEFT),
-                        top,
-                        stats.at<int>(i, cv::CC_STAT_WIDTH),
-                        height);
+      out_bb = cv::Rect(left, top, width, height);
+      // out_bb = cv::Rect(stats.at<int>(i, cv::CC_STAT_LEFT),
+      //                   top,
+      //                   stats.at<int>(i, cv::CC_STAT_WIDTH),
+      //                   height);
     }
   }
-  return best_score > 0;
+  return best_score > -1e9;
 }
 
 void RowCounterNode::handleRowEvent()
