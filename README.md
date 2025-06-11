@@ -1,71 +1,70 @@
 # Rail Detector & Row Counter  
-**Greenhouse localisation for the Viscon Operational Robotics Engineer Assignment**
+**Greenhouse rail detection for the Viscon Operational Robotics Engineer Assignment**
 
-A ROS 2 C++ package that
+A ROS 2 C++ package that:
 
 * Detects greenhouse heating rails in the infrared stream of an Intel RealSense D456 (Q1)
-
 * Counts the rows the robot has passed using the rail detections & odometry (Q2)
 
-The package is self‑contained and reproducible in ≤ 10 minutes on a fresh ROS 2 Jenny install.
+The package is self‑contained and reproducible in ≤ 10 minutes on a fresh ROS 2 Jazzy install.
 
 ---
 
 ## Table of Contents
-* [Project overview](#overview)
-* [Repository layout](#layout)
+* [Project overview](#project-overview)
+* [Repository layout](#repository-layout)
 * [Prerequisites](#prerequisites)
-* [Build instructions](#build)
-* [Run instructions](#run)
-* [Detailed solution per question](#solutions)
-    *    [Q 1 – Row detection](#q1)
-    *    [Q 2 – Row counting](#q2)
-    *    [Q 3 – Testing & validation plan](#q3)
-* [Launch-file cheatsheet](#launch-cheatsheet)
-* [Troubleshooting & FAQ](#faq)
+* [Build instructions](#build-instructions)
+* [Run instructions](#run-instructions)
+* [Detailed solution per question](#detailed-solution-per-assignment-question)
+    * [Q 1 – Row detection](#q-1--row-detection)
+    * [Q 2 – Row counting](#q-2--row-counting)
+    * [Q 3 – Testing & validation plan](#q-3--testing--validation-plan)
+* [Launch-file cheatsheet](#launch-file)
+* [Troubleshooting & FAQ](#troubleshooting--faq)
 
 ---
 
-
-## 1  Project overview
+## Project overview
 A side-mounted Intel RealSense D456 camera looks sideways while the robot drives through greenhouse aisles.  
 This repository provides two ROS 2 nodes:
 
 | Node | Purpose | Topics (pub →, sub ←) |
 |------|---------|------------------------|
-| **`rail_detector_node`** | Pixel-wise rail segmentation using an ONNX deep learning model | ← `/d456_pole/infra1/image_rect_raw` (mono-8), `~/preprocessed` (mono-8), `~/overlay` (bgr 8), `/rail_mask` (mono-8) |
-| **`row_counter_node`** | Counts how many heating-pipe rails have been passed | ← `/rail_mask`, `/odometry/filtered`, `rows_count` (`std_msgs/UInt32`) |
+| `rail_detector_node` | Pixel-wise rail segmentation using an ONNX deep learning model | ← `/d456_pole/infra1/image_rect_raw`, → `~/preprocessed`, `~/overlay`, `/rail_mask` |
+| `row_counter_node` | Counts how many heating-pipe rails have been passed | ← `/rail_mask`, `/odometry/filtered`, → `rows_count` |
 
 Both nodes can be launched together with a single launch file, optionally bringing up *rqt_image_view* for live inspection and selecting GPU vs CPU execution.
 
+---
 
-## 2  Repository layout
+## Repository layout
+
 ```
-rail_detector/
-├── include/
-│   ├── rail_detector_node.hpp
-│   └── row_counter_node.hpp                       
-├── launch/
-│   └── rail_detector_launch.py
-├── models/                        
-├── src/
-│   ├── rail_detector_node.cpp
-│   └── row_counter_node.cpp
-├── CMakeLists.txt           
-├── package.xml
-└── README.md
+root/
+├── rail_detector/
+│   ├── include/
+│   ├── launch/
+│   ├── models/
+│   ├── src/
+│   ├── CMakeLists.txt
+│   ├── package.xml
+│   └── README.md
+├── training/
+│   ├── preprocess_images.py
+│   ├── postprocess_images.py
+│   ├── train_rails.py
+│   └── dataset/ ...
+├── rail_overlay.mp4
+├── README.md
+└── .gitignore
 ```
 
-## 3  Dependencies
+---
 
-> Tested on Ubuntu 24.04 + ROS 2 Jazzy 
+## Prerequisites
 
-* **OS** Ubuntu 24.04 LTS 
-* **ROS 2** Jazzy Jalisco 
-* **CUDA-capable GPU**  *(optional)* 
-* **ONNX Runtime 1.17+** built **with** or **without** CUDA EP  
-
-### ROS 2 & system packages
+Tested on Ubuntu 24.04 + ROS 2 Jazzy
 
 ```bash
 sudo apt update && sudo apt install -y \
@@ -78,123 +77,161 @@ sudo apt update && sudo apt install -y \
   libopencv-dev
 ```
 
-### ONNX Runtime (GPU)
+### Install ONNX Runtime (required)
 
-> **Note:** This step is not needed if run using CPU, this process can take up to 10 min. Build ORT 1.18 with CUDA 12 takes ≈10 min:
+**CPU‑only (quick):**
 
->```bash
->mkdir -p ~/onnxruntime && cd ~/onnxruntime
-> 
->./build.sh --config Release --update --parallel --build --use_cuda >--cuda_home /usr/local/cuda --cudnn_home /usr/local/cuda >--skip_tests
->
->```
-
-> **Note:** if you compiled ONNX Runtime yourself, export the root before building the workspace:
-
-> ```bash
-> export ONNXRUNTIME_ROOT=$HOME/onnxruntime  
-> ```
-
-## 4  Build instructions
 ```bash
-# 1. workspace skeleton
-mkdir -p ~/ros2_ws/src && cd ~/ros2_ws/src
-
-# 2. clone repository
-git clone https://github.com/kderoodt/viscon-assignment.git rail_detector
-
-# 3. build
-cd ~/ros2_ws
-colcon build --packages-select rail_detector
-
-# 4. source overlay (every new shell)
-source install/setup.bash
-```
-The ```CMakeLists.txt``` provided in the assignment links OpenCV, ONNX Runtime (CPU + CUDA) and registers **`row_counter_node`** both as a component library *and* a standalone executable.
-
-## 5  Run instructions
-### All-in-one launch
-```bash
-ros2 launch rail_detector rail_detector_launch.py     use_row_counter:=true     use_rqt:=true     use_gpu:=true        
-```
-Default values are **`use_row_counter=true`**, **`use_rqt=true`**, **`use_gpu=true`**.
-
-### Headless / CPU-only example
-```bash
-ros2 launch rail_detector rail_detector_launch.py     use_rqt:=false use_gpu:=false
+sudo apt install libonnxruntime-dev       # small CPU‑only library
 ```
 
-## 6  Detailed solution per assignment question
+**GPU build (optional but way faster):**
 
-
-### Q 1 – Row detection
-The **`rail_detector_node`** subscribes to the infra-red image, applies classical CV pre-processing, forwards the 768 × 720 crop through an ONNX segmentation network, and finally publishes a binary mask and colour overlay.
-
-Pipeline:
-
-* Pre-processing the image 
-    * Rotate image 90° CW            
-    * Crop lower 60 %          
-    * Enhances local contrast - Clahe(clip=4.0)          
-    * Suppresses noise - Gaussian_blur(5×5)
-* Using trained ONNX Runtime model for detection prediction
-* Post-processing  
-    * Only keep large blobs  
-
-Outputs:
-* Topic `/rail_detector/preprocessed` – 720 × 768 mono8 pre‑processed framedetections.
-* Topic `/rail_mask` – Binary mask (0/255).
-* Topic `/rail_detector/overlay` – BGR stream with red rail overlay.
-
-
-GPU vs CPU is runtime-selectable by appending or omitting the CUDA EP when the **`use_gpu`** parameter is set.
-
-#### 📹 Demo video
-
-https://github.com/user-attachments/assets/a0ca3169-3431-446a-8d1a-679908a3250b
-
-
-### Q 2 – Row counting
-The **`row_counter_node`** listens to the binary mask and odometry:
-* Keep only blobs below *roi_y_ratio* (default 0.5 × image height) and larger than *min_area_px* ✕ px.  
-* A state-machine detects the rising edge when a new rail enters the view; possible re-entries are debounced via *min_overlap_px*.
-* The `(x,y)` odom pose at each detection is compared to the last counted pose.  
-   If the Euclidean distance ≥ *row_spacing* (default 1 m) we increment `row_count_` and publish it.
-
-Outputs:
-* Topic `rows_count` – live counter for other nodes.
-* Console log – human readable summary.
-
-
-### Q 3 – Testing & validation plan
-
-## 7  Launch-file 
-
-From *launch/rail_detector_launch.py*:
-
-| Argument | Default | Meaning |
-|-----------|---------|---------|
-| `use_row_counter` | `true` | Whether to start **row_counter_node_exec** |
-| `use_rqt`         | `true` | Open *rqt_image_view* on `~/overlay` |
-| `use_gpu`         | `true` | Append CUDA EP to ONNX Runtime |
-| `model_path`      | *see file* | Absolute or package-relative `.onnx` path |
-
-Example combos:
 ```bash
-# Detector only, headless CPU
-ros2 launch rail_detector rail_detector_launch.py     use_row_counter:=false use_rqt:=false use_gpu:=false
+git clone --recursive https://github.com/microsoft/onnxruntime
+cd onnxruntime
+./build.sh --config Release --update --parallel --build \
+           --use_cuda --cuda_home /usr/local/cuda --cudnn_home /usr/local/cuda \
+           --skip_tests
+export ONNXRUNTIME_ROOT=$HOME/onnxruntime
+```
 
-# Full stack + GUI on GPU
-ros2 launch rail_detector rail_detector_launch.py  # no args
+> Skip `--use_cuda` to compile a CPU‑only ORT and launch with `use_gpu:=false`.
+```bash
+# ONNX Runtime 1.18+ with CUDA 12
+git clone --recursive https://github.com/microsoft/onnxruntime
+cd onnxruntime
+./build.sh --config Release --update --parallel --build --use_cuda --cuda_home /usr/local/cuda --cudnn_home /usr/local/cuda --skip_tests
+export ONNXRUNTIME_ROOT=$HOME/onnxruntime
 ```
 
 ---
 
-## 8  Troubleshooting & FAQ
-> **Q:** ONNX Runtime complains “no CUDA devices found”.  
-> **A:** Set `use_gpu:=false` or install the *libonnxruntime-dev* CPU-only package.
+## Build instructions
 
-> **Q:** Rqt shows an empty image.  
-> **A:** Make sure to select `rail_detector_node/overlay`
+```bash
+mkdir -p ~/ros2_ws/src && cd ~/ros2_ws/src
+git clone https://github.com/kderoodt/viscon-assignment.git rail_detector
+cd ..
+colcon build --packages-select rail_detector
+source install/setup.bash
+```
+
+---
+
+## Run instructions
+
+```bash
+ros2 launch rail_detector rail_detector_launch.py     use_row_counter:=true     use_rqt:=true     use_gpu:=true
+```
+
+### Headless / CPU-only
+```bash
+ros2 launch rail_detector rail_detector_launch.py     use_rqt:=false use_gpu:=false
+```
+
+---
+
+## Detailed solution per assignment question
+
+### Q 1 – Row detection
+
+The `rail_detector_node` performs rail segmentation in a three-stage process:
+
+**Pre-processing**
+- Rotate 90° clockwise
+- Crop bottom 60% of height
+- Apply CLAHE for contrast enhancement
+- Apply 5×5 Gaussian blur
+- Normalise to float32 (0–1)
+
+**Model**
+- Using a custom U-Net architecture trained using `train_rails.py`
+- Encoder: ResNet-34 (ImageNet weights)
+- Output: 2-class segmentation (rail vs background)
+- Loss: CrossEntropy + DiceLoss
+- Augmentation: flip, brightness, affine
+- Trained with torch + albumentations + segmentation_models_pytorch
+
+**Post-processing**
+- Remove small noise blobs using `cv2.connectedComponentsWithStats`
+- Output binary mask + overlay image
+
+**Published topics**
+- `/rail_detector/preprocessed` – Preprocessed mono8 image
+- `/rail_mask` – Binary rail segmentation
+- `/rail_detector/overlay` – Red overlay on image
+
+**Demo video**  
+https://github.com/user-attachments/assets/a0ca3169-3431-446a-8d1a-679908a3250b
+
+**Training/obtaining U-NET ONNX model**  
+- Pre-processing image data using `preprocess_images.py` before annotating data.
+- Dataset is annotated using CVAT.
+- Annotated data is transformed in a mask using `postprocess_images.py`.
+- A custom U-Net architecture trained using `train_rails.py`.
+
+---
+
+### Q 2 – Row counting
+
+The `row_counter_node` implements a robust debounced row counter:
+
+- Input: binary mask + `/odometry/filtered`
+- Filters:
+  - Ignore blobs above ROI Y (default: lower 50%)
+  - Ignore area < min_area_px
+  - Compare current pose with last counted rail
+- Increment count if distance ≥ row_spacing (0.5 m)
+- Debounce overlaps to avoid duplicates
+
+Publishes:
+- `/rows_count` (UInt32)
+- Console output with verbose detection details
+
+---
+
+### Q 3 – Testing & validation plan
+
+1. Visual validation with:
+   - rqt_image_view (`~/overlay`)
+   - rosbag replay
+2. Ground truth comparison (masks vs predictions)
+3. Console log with per-row count outputs
+4. Manual inspection with saved overlays & masks
+5. Optional metrics script XXX
+
+---
+
+## Launch-file
+
+From `rail_detector/launch/rail_detector_launch.py`:
+
+| Arg              | Default | Description |
+|------------------|---------|-------------|
+| `use_row_counter`| `true`  | Enable row counting node |
+| `use_rqt`        | `true`  | Open overlay in rqt |
+| `use_gpu`        | `true`  | Use ONNX CUDA EP |
+| `model_path`     | auto    | Path to .onnx model |
+
+Examples:
+
+```bash
+ros2 launch rail_detector rail_detector_launch.py     use_row_counter:=false use_gpu:=false use_rqt:=false
+ros2 launch rail_detector rail_detector_launch.py
+```
+
+---
+
+## Troubleshooting & FAQ
+
+**Q:** Rqt shows no image  
+**A:** Use topic: `rail_detector_node/overlay`
+
+**Q:** ONNX Runtime crashes with CUDA  
+**A:** Use `use_gpu:=false` or ensure correct CUDA version
+
+**Q:** Output mask is empty  
+**A:** Verify the model is exported properly and pre-processing matches training
 
 ---
