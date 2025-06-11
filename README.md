@@ -202,13 +202,7 @@ Publishes:
 
 ### Q 3 – Testing & validation plan
 
-1. Visual validation with:
-   - rqt_image_view (`~/overlay`)
-   - rosbag replay
-2. Ground truth comparison (masks vs predictions)
-3. Console log with per-row count outputs
-4. Manual inspection with saved overlays & masks
-5. Optional metrics script XXX
+See 'Test_and_validation_plan.pdf'
 
 ---
 

@@ -15,13 +15,6 @@ RailDetectorNode::RailDetectorNode()
   session_options_.SetIntraOpNumThreads(1);
   session_options_.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
 
-  // OrtCUDAProviderOptions cuda_opts{};
-  // cuda_opts.device_id                 = 0;
-  // cuda_opts.gpu_mem_limit             = SIZE_MAX;
-  // cuda_opts.cudnn_conv_algo_search    = OrtCudnnConvAlgoSearchExhaustive;
-  // cuda_opts.do_copy_in_default_stream = 1;
-  // session_options_.AppendExecutionProvider_CUDA(cuda_opts);
-
     if (use_gpu) {                     
     OrtCUDAProviderOptions cuda_opts{};
     cuda_opts.device_id                 = 0;

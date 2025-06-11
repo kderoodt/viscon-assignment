@@ -5,6 +5,9 @@ rail_detector/log/
 rail_detector/.vscode/
 
 training/.idea/
+.vscode/
+rail_detector/include/.vscode/
+
 
 # --- general C++ artefacts ----------------------------------------
 *.o
