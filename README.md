@@ -1,15 +1,15 @@
 # Rail Detector & Row Counter  
 **Greenhouse rail detection for the Viscon Operational Robotics Engineer Assignment**
 
-A ROS 2 C++ package that:
+A ROS 2 C++ package `rail_detector` that:
 
 * Detects greenhouse heating rails in the infrared stream of an Intel RealSense D456 (Q1)
 * Counts the rows the robot has passed using the rail detections & odometry (Q2)
 
 The package is self‑contained and reproducible in ≤ 10 minutes on a fresh ROS 2 Jazzy install.
 
-The repository also contains a 'training' folder. This folder contains files and data for training the U-NET ONNX model. 
-> **NOTE!** A trained ONNX model is provided in 'rail_detector/models'. So, no training is needed!
+The repository also contains a `training` folder. This folder contains files and data for training the U-NET ONNX model. 
+> **NOTE!** A trained ONNX model is provided in `rail_detector/models`. So, no training is needed!
 
 ---
 
@@ -59,6 +59,7 @@ root/
 │   ├── train_rails.py
 │   └── dataset/ ...
 ├── rail_overlay.mp4
+├── Test_and_validation_plan.pdf
 ├── README.md
 └── .gitignore
 ```
@@ -82,12 +83,6 @@ sudo apt update && sudo apt install -y \
 
 ### Install ONNX Runtime (required)
 
-**CPU‑only (quick):**
-
-```bash
-sudo apt install libonnxruntime-dev       # small CPU‑only library
-```
-
 **GPU build (optional but 5-10min):**
 
 ```bash
@@ -99,7 +94,13 @@ cd onnxruntime
 export ONNXRUNTIME_ROOT=$HOME/onnxruntime
 ```
 
-> Skip `--use_cuda` to compile a CPU‑only ORT and launch with `use_gpu:=false`.
+**CPU‑only (quick):**
+
+```bash
+sudo apt install libonnxruntime-dev       # small CPU‑only library
+```
+
+> Skip `--use_cuda` to compile a CPU‑only.
 ```bash
 # ONNX Runtime 1.18+ with CUDA 12
 git clone --recursive https://github.com/microsoft/onnxruntime
@@ -125,16 +126,19 @@ source install/setup.bash
 ## Run instructions
 
 ```bash
+# Launch rail detector and row counter
 ros2 launch rail_detector rail_detector_launch.py     use_row_counter:=true     use_rqt:=true     use_gpu:=true
+
+# Play rosbag
+ros2 bag play ~/rosbags/viscon
 ```
 
-### Headless / CPU-only
+### CPU-only
 ```bash
-ros2 launch rail_detector rail_detector_launch.py     use_rqt:=false use_gpu:=false
-```
+# Launch rail detector and row counter
+ros2 launch rail_detector rail_detector_launch.py     use_gpu:=false
 
-## Play Viscon rosbag
-```bash
+# Play rosbag
 ros2 bag play ~/rosbags/viscon
 ```
 
@@ -143,6 +147,15 @@ ros2 bag play ~/rosbags/viscon
 ## Detailed solution per assignment question
 
 ### Q 1 – Row detection
+
+#### Training/obtaining U-NET ONNX model
+
+- Pre-processing image data using `preprocess_images.py` before annotating data.
+- Dataset is annotated using CVAT.
+- Annotated data is transformed in a mask using `postprocess_images.py`.
+- A custom U-Net architecture trained using `train_rails.py`.
+
+#### Rail detection 
 
 The `rail_detector_node` performs rail segmentation in a three-stage process:
 
@@ -162,7 +175,7 @@ The `rail_detector_node` performs rail segmentation in a three-stage process:
 - Trained with torch + albumentations + segmentation_models_pytorch
 
 **Post-processing**
-- Remove small noise blobs using `cv2.connectedComponentsWithStats`
+- Remove small noise blobs
 - Output binary mask + overlay image
 
 **Published topics**
@@ -174,11 +187,6 @@ The `rail_detector_node` performs rail segmentation in a three-stage process:
 
 https://github.com/user-attachments/assets/a0ca3169-3431-446a-8d1a-679908a3250b
 
-**Training/obtaining U-NET ONNX model**  
-- Pre-processing image data using `preprocess_images.py` before annotating data.
-- Dataset is annotated using CVAT.
-- Annotated data is transformed in a mask using `postprocess_images.py`.
-- A custom U-Net architecture trained using `train_rails.py`.
 
 ---
 
