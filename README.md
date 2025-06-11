@@ -9,7 +9,7 @@ A ROS 2 C++ package that:
 The package is self‑contained and reproducible in ≤ 10 minutes on a fresh ROS 2 Jazzy install.
 
 The repository also contains a 'training' folder. This folder contains files and data for training the U-NET ONNX model. 
-> A trained ONNX model is provided in 'rail_detector/models'. So, no training is needed!
+> **NOTE!** A trained ONNX model is provided in 'rail_detector/models'. So, no training is needed!
 
 ---
 

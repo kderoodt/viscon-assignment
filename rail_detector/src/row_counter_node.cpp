@@ -12,7 +12,7 @@ RowCounterNode::RowCounterNode(const rclcpp::NodeOptions & options)
   row_spacing_     = declare_parameter("row_spacing",     0.60);  
   min_area_px_     = declare_parameter("min_area_px",     1000);
   roi_y_ratio_     = declare_parameter("roi_y_ratio",     0.2);   
-  min_overlap_px_  = declare_parameter("min_overlap_px",  200); // 750
+  min_overlap_px_  = declare_parameter("min_overlap_px",  1000); // 750
 
   sub_mask_ = create_subscription<sensor_msgs::msg::Image>(
       "/rail_mask", rclcpp::SensorDataQoS(),
@@ -50,10 +50,14 @@ void RowCounterNode::maskCallback(
   else if (active_rail_)
   {
     int overlap = rail_found ? (bb & active_bb_).area() : 0;
-    int overlap_width = (bb & active_bb_).width;
+    // int overlap_width = (bb & active_bb_).width;
 
-    if (overlap < min_overlap_px_)
-    // if (overlap < min_overlap_px_ && overlap_width > 50)
+    int active_cx = active_bb_.x + active_bb_.width / 2;
+    int current_cx = bb.x + bb.width / 2;
+    int horizontal_gap = std::abs(current_cx - active_cx);
+
+    // if (overlap < min_overlap_px_)
+    if (overlap < min_overlap_px_ && horizontal_gap > 200)
       active_rail_ = false;              
   }
 }
