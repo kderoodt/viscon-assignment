@@ -1,8 +1,8 @@
 # --- colcon / ROS2 -------------------------------------------------
-build/
-install/
-log/
-.vscode/
+rail_detector/build/
+rail_detector/install/
+rail_detector/log/
+rail_detector/.vscode/
 
 # --- general C++ artefacts ----------------------------------------
 *.o
