@@ -162,7 +162,8 @@ The `rail_detector_node` performs rail segmentation in a three-stage process:
 - `/rail_mask` – Binary rail segmentation
 - `/rail_detector/overlay` – Red overlay on image
 
-**Demo video**  
+#### 📹 Demo video
+
 https://github.com/user-attachments/assets/a0ca3169-3431-446a-8d1a-679908a3250b
 
 **Training/obtaining U-NET ONNX model**  
