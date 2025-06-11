@@ -4,6 +4,8 @@ rail_detector/install/
 rail_detector/log/
 rail_detector/.vscode/
 
+training/.idea/
+
 # --- general C++ artefacts ----------------------------------------
 *.o
 *.so
