@@ -20,7 +20,6 @@ private:
 
   double  row_spacing_;
   int     min_area_px_;
-  double  roi_y_ratio_;
   int     min_overlap_px_;
 
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_mask_;

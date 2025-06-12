@@ -37,9 +37,11 @@ target_link_libraries(rail_detector_node
 
 target_include_directories(row_counter_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+
 ament_target_dependencies(row_counter_node
   rclcpp rclcpp_components sensor_msgs nav_msgs std_msgs
-  cv_bridge OpenCV)
+  cv_bridge OpenCV image_transport)
+
 rclcpp_components_register_nodes(row_counter_node "RowCounterNode")
 
 add_executable(row_counter_node_exec
@@ -49,6 +51,16 @@ target_compile_definitions(row_counter_node_exec PRIVATE
 target_include_directories(row_counter_node_exec PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 target_link_libraries(row_counter_node_exec row_counter_node)
+
+ament_target_dependencies(row_counter_node_exec
+  rclcpp
+  sensor_msgs
+  nav_msgs
+  std_msgs
+  cv_bridge
+  OpenCV
+  image_transport)
+
 
 install(TARGETS row_counter_node row_counter_node_exec
         ARCHIVE DESTINATION lib

@@ -19,12 +19,11 @@ The repository also contains a `training` folder. This folder contains files and
 * [Prerequisites](#prerequisites)
 * [Build instructions](#build-instructions)
 * [Run instructions](#run-instructions)
-* [Detailed solution per question](#detailed-solution-per-assignment-question)
+* [Solution per question](#detailed-solution-per-assignment-question)
     * [Q 1 – Row detection](#q-1--row-detection)
     * [Q 2 – Row counting](#q-2--row-counting)
     * [Q 3 – Testing & validation plan](#q-3--testing--validation-plan)
 * [Launch-file cheatsheet](#launch-file)
-* [Troubleshooting & FAQ](#troubleshooting--faq)
 
 ---
 
@@ -128,7 +127,10 @@ source install/setup.bash
 ```bash
 # Launch rail detector and row counter
 ros2 launch rail_detector rail_detector_launch.py     use_row_counter:=true     use_rqt:=true     use_gpu:=true
+```
 
+#### In a second terminal
+```bash
 # Play rosbag
 ros2 bag play ~/rosbags/viscon
 ```
@@ -137,7 +139,10 @@ ros2 bag play ~/rosbags/viscon
 ```bash
 # Launch rail detector and row counter
 ros2 launch rail_detector rail_detector_launch.py     use_gpu:=false
+```
 
+#### In a second terminal
+```bash
 # Play rosbag
 ros2 bag play ~/rosbags/viscon
 ```
@@ -192,12 +197,14 @@ https://github.com/user-attachments/assets/a0ca3169-3431-446a-8d1a-679908a3250b
 
 ### Q 2 – Row counting
 
+#### OLD APPROACH
+
 The `row_counter_node` implements a robust debounced row counter:
 
 - Input: binary mask + `/odometry/filtered`
 - Filters:
-  - Ignore blobs above ROI Y (default: lower 60%)
   - Ignore area < min_area_px
+  - Ignore rails where width > height
   - Compare current pose with last counted rail
 - Increment count if distance ≥ row_spacing (0.5 m)
 - Debounce overlaps to avoid duplicates
@@ -206,11 +213,23 @@ Publishes:
 - `/rows_count` (UInt32)
 - Console output with verbose detection details
 
+#### NEW APPROACH (work in progress)
+
+The node continuously segments rails, keeps short-term tracks of every visible rail blob, and increments a row-counter only when a new rail appears after the robot has driven at least row_spacing metres since the previous count.
+
+- **Subscribe** to `/rail_mask` (segmentation) and `/odometry/filtered`.
+- **Detect rail blobs** in each frame.
+- **Track blobs** across frames: multiple boxes are treated as the same rail when their IoU ≥ 0.05 **or** their centroids shift less than 25 % of the box height.
+- **Ignore duplicates**: if a new blob overlaps an existing track with IoU ≥ 0.5 it is considered part of that rails and not counted.
+- **Count a rail** only when a rail appears **and** the robot has moved at least `row_spacing` since the last counted rail.
+- **Publish** the running count on `rows_count`.
+
+
 ---
 
 ### Q 3 – Testing & validation plan
 
-See 'Test_and_validation_plan.pdf'
+See `Test_and_validation_plan.pdf`
 
 ---
 
@@ -223,7 +242,6 @@ From `rail_detector/launch/rail_detector_launch.py`:
 | `use_row_counter`| `true`  | Enable row counting node |
 | `use_rqt`        | `true`  | Open overlay in rqt |
 | `use_gpu`        | `true`  | Use ONNX CUDA EP |
-| `model_path`     | auto    | Path to .onnx model |
 
 Examples:
 
@@ -231,18 +249,5 @@ Examples:
 ros2 launch rail_detector rail_detector_launch.py     use_row_counter:=false use_gpu:=false use_rqt:=false
 ros2 launch rail_detector rail_detector_launch.py
 ```
-
----
-
-## Troubleshooting & FAQ
-
-**Q:** Rqt shows no image  
-**A:** Use topic: `rail_detector_node/overlay`
-
-**Q:** ONNX Runtime crashes with CUDA  
-**A:** Use `use_gpu:=false` or ensure correct CUDA version
-
-**Q:** Output mask is empty  
-**A:** Verify the model is exported properly and pre-processing matches training
 
 ---

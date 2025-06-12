@@ -61,24 +61,6 @@ class UNet(nn.Module):
         return self.out(x)
 
 
-# class UNet(nn.Module):
-#     def __init__(self, n_classes=2):
-#         super().__init__()
-#         self.d1 = DoubleConv(1,  32); self.p1 = nn.MaxPool2d(2)
-#         self.d2 = DoubleConv(32, 64); self.p2 = nn.MaxPool2d(2)
-#         self.mid= DoubleConv(64,128)
-#         self.u2 = nn.ConvTranspose2d(128,64,2,2); self.c2 = DoubleConv(128,64)
-#         self.u1 = nn.ConvTranspose2d(64 ,32,2,2); self.c1 = DoubleConv(64 ,32)
-#         self.out= nn.Conv2d(32, n_classes, 1)
-#     def forward(self,x):
-#         d1 = self.d1(x)
-#         d2 = self.d2(self.p1(d1))
-#         x  = self.mid(self.p2(d2))
-#         x  = self.c2(torch.cat([self.u2(x), d2], 1))
-#         x  = self.c1(torch.cat([self.u1(x), d1], 1))
-#         return self.out(x)
-
-
 class RailSet(Dataset):
     def __init__(self, root: pathlib.Path, crop: int=0, train: bool = True):
         self.imgs  = sorted((root/'images').glob('*.png'))
@@ -149,14 +131,12 @@ def validate(model, loader, loss_fn, device, epoch):
         logits = model(imgs)
         losses.append(loss_fn(logits, masks).item())
         ious.append(iou_batch(logits,masks))
-        # save visualisation for first val batch
 
         if epoch == 20:
             for b, (imgs, masks) in enumerate(loader):
                 imgs, masks = imgs.to(device), masks.to(device)
                 logits = model(imgs)
 
-                # Save every prediction and ground truth
                 for i in range(imgs.size(0)):
                     idx = b * loader.batch_size + i
                     gt = masks[i].cpu().numpy() * 255
@@ -170,7 +150,7 @@ def validate(model, loader, loss_fn, device, epoch):
 def clean_mask(mask: np.ndarray, min_area: int = 3000) -> np.ndarray:
     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
     cleaned = np.zeros_like(mask)
-    for i in range(1, num_labels):  # skip background
+    for i in range(1, num_labels):  
         if stats[i, cv2.CC_STAT_AREA] >= min_area:
             cleaned[labels == i] = 255
     return cleaned
@@ -223,9 +203,6 @@ def main():
             best_miou = miou
             torch.save(net.state_dict(), 'rail_unet_best.pt')
             print(f'Saved best model (mIoU={best_miou:.3f}) → rail_unet_best.pt')
-
-    # torch.save(net.state_dict(),'rail_unet.pt')
-    # print('✔ Saved PyTorch model → rail_unet.pt')
 
     if args.export_onnx:
         print('Exporting ONNX model...')

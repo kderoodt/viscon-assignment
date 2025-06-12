@@ -1,6 +1,18 @@
 #include "rail_detector/rail_detector_node.hpp"
 #include <onnxruntime_cxx_api.h>
 
+
+// ── RailDetectorNode overview ──────────────────────────────────────────────
+// runs an ONNX segmentation model on RealSense IR frames to locate greenhouse
+// heating rails. Publishes a binary mask and a red overlay for easy 
+// visualisation.
+//  • Subscribes:  /d456_pole/infra1/image_rect_raw   (mono‑8)
+//  • Publishes:  ~/preprocessed (mono‑8), /rail_mask (mono‑8), ~/overlay (bgr‑8)
+//  • Params:     min_area  (px² filter for blobs, default 600)
+//                use_gpu   (enable CUDA provider)
+//                model_path (ONNX file, relative to package allowed)
+// ──────────────────────────────────────────────────────────────────────────
+
 using std::placeholders::_1;
 
 RailDetectorNode::RailDetectorNode()
@@ -9,9 +21,11 @@ RailDetectorNode::RailDetectorNode()
   session_options_(),
   session_(nullptr)
 {
-  min_area_px_ = this->declare_parameter<int>("min_area", 800);
+  // ── parameters ───────────────────────────────────────────────
+  min_area_px_ = this->declare_parameter<int>("min_area", 600);
   bool use_gpu  = this->declare_parameter<bool>("use_gpu", true);
 
+  // ── ONNX Runtime setup ───────────────────────────────────────
   session_options_.SetIntraOpNumThreads(1);
   session_options_.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
 
@@ -24,6 +38,7 @@ RailDetectorNode::RailDetectorNode()
     session_options_.AppendExecutionProvider_CUDA(cuda_opts);
   }
 
+  // ── resolve model path ──────────────────────────────────────
   std::string model_path =
       declare_parameter<std::string>("model_path",
                                      "models/rail_detector.onnx");
@@ -39,6 +54,7 @@ RailDetectorNode::RailDetectorNode()
   auto node_ptr = std::shared_ptr<rclcpp::Node>(this, [](rclcpp::Node*){});
   image_transport::ImageTransport it(node_ptr);
 
+  // ── subscriptions & publisher ────────────────────────────────────────
   sub_ = it.subscribe("/d456_pole/infra1/image_rect_raw", 1,
                       std::bind(&RailDetectorNode::imageCallback, this, _1));
   pub_preprocessed_ = it.advertise("~/preprocessed", 1);
@@ -54,15 +70,17 @@ void RailDetectorNode::imageCallback(
     cv_bridge::CvImageConstPtr cv_ptr =
         cv_bridge::toCvShare(msg, "mono8");
 
+    // ── rotate camera (mounted sideways) ───────────────────────
     cv::Mat rot;
     cv::rotate(cv_ptr->image, rot, cv::ROTATE_90_CLOCKWISE);
 
+    // ── crop floor region (bottom 60 %) ────────────────────────
     const int crop_y = static_cast<int>(0.4 * rot.rows);
     cv::Mat crop = rot(cv::Range(crop_y, rot.rows), cv::Range::all());
 
+    // ── improve contrast + reduce noise ───────────────────────
     cv::Mat eq;
     cv::createCLAHE(4.0, {8,8})->apply(crop, eq);
-
     cv::Mat blur;
     cv::GaussianBlur(eq, blur, cv::Size(5,5), 0);
 
@@ -72,6 +90,7 @@ void RailDetectorNode::imageCallback(
     cv::Mat in_f;
     blur.convertTo(in_f, CV_32F, 1.0/255.0);           
 
+    // ── prepare tensor 1×1×768×720 ────────────────────────────
     const std::array<int64_t,4> shape{1,1,768,720};
     std::vector<float> in_buf(shape[2]*shape[3]);
     std::memcpy(in_buf.data(), in_f.data,
@@ -83,17 +102,14 @@ void RailDetectorNode::imageCallback(
         mem, in_buf.data(), in_buf.size(),
         shape.data(), shape.size());
 
-    Ort::AllocatedStringPtr in_name  =
-        session_.GetInputNameAllocated (0, Ort::AllocatorWithDefaultOptions());
-    Ort::AllocatedStringPtr out_name =
-        session_.GetOutputNameAllocated(0, Ort::AllocatorWithDefaultOptions());
+    // ── inference ─────────────────────────────────────────────
+    Ort::AllocatedStringPtr in_name = session_.GetInputNameAllocated (0, Ort::AllocatorWithDefaultOptions());
+    Ort::AllocatedStringPtr out_name = session_.GetOutputNameAllocated(0, Ort::AllocatorWithDefaultOptions());
     const char* input_names[]  = { in_name.get()  };
     const char* output_names[] = { out_name.get() };
+    auto outs = session_.Run(Ort::RunOptions{nullptr},input_names,  &in_tensor, 1,output_names, 1);
 
-    auto outs = session_.Run(Ort::RunOptions{nullptr},
-                             input_names,  &in_tensor, 1,
-                             output_names, 1);
-
+    // ── logits → binary mask ──────────────────────────────────
     float* out_data = outs.front().GetTensorMutableData<float>();
     cv::Mat logits(768, 720, CV_32F, out_data);
 
@@ -101,6 +117,7 @@ void RailDetectorNode::imageCallback(
     cv::threshold(logits, rail_mask, 0.5, 255, cv::THRESH_BINARY_INV);
     rail_mask.convertTo(rail_mask, CV_8U);
 
+    // ── keep only large connected blobs ───────────────────────
     cv::Mat labels, stats, centroids;
     int n = cv::connectedComponentsWithStats(rail_mask, labels,
                                              stats, centroids, 8, CV_32S);
@@ -115,6 +132,7 @@ void RailDetectorNode::imageCallback(
     pub_mask_.publish(
         cv_bridge::CvImage(msg->header, "mono8", rail_mask).toImageMsg());
 
+    // ── red overlay for visual debug ──────────────────────────
     cv::Mat base;
     cv::cvtColor(blur, base, cv::COLOR_GRAY2BGR);
 

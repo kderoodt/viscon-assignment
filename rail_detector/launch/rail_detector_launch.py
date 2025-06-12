@@ -52,8 +52,7 @@ def generate_launch_description():
         parameters=[{
             'row_spacing':     0.60,
             'min_area_px':     1000,
-            'roi_y_ratio':     0.2,
-            'min_overlap_px':  100, # 750
+            'min_overlap_px':  200,
         }],
         condition=IfCondition(use_row_counter)           
     )
