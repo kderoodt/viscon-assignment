@@ -184,6 +184,14 @@ ros2 launch rail_detector rail_detector_launch.py     use_gpu:=false
 
 The `rail_detector_node` runs each incoming IR image through a pre-processing step (resize/contrast-enhance, etc.), feeds the cleaned frame to an ONNX segmentation model, thresholds the output to a binary rail mask, filters out small blobs, and publishes both the mask and a red overlay for visual debug. Parameters let you pick the model file, turn GPU support on/off, and set a minimum blob size. 
 
+- **Inputs**
+  - `/d456_pole/infra1/image_rect_raw` `sensor_msgs/msg/Image` – mono8 image.
+
+- **Published topics**
+  - `/rail_detector/preprocessed` – Preprocessed mono8 image.
+  - `/rail_mask` – Binary rail segmentation.
+  - `/rail_detector/overlay` – Red overlay on image.
+
 #### Training/obtaining U-NET ONNX model
 
 - Pre-processing image data using `preprocess_images.py` before annotating data.
@@ -214,13 +222,6 @@ The `rail_detector_node` performs rail segmentation in a three-stage process:
 - Remove small noise blobs
 - Output binary mask + overlay image
 
-- **Inputs**
-  - `/d456_pole/infra1/image_rect_raw` `sensor_msgs/msg/Image` – mono8 image.
-
-**Published topics**
-- `/rail_detector/preprocessed` – Preprocessed mono8 image.
-- `/rail_mask` – Binary rail segmentation.
-- `/rail_detector/overlay` – Red overlay on image.
 
 #### 📹 Demo video
 
@@ -248,12 +249,11 @@ The `row_counter_node` uses the binary rail-mask image stream, picks the rail bl
   - `min_overlap_px` (default **500**) – overlap threshold to decide we have left the current rail.
 
 - **Algorithm**
-  1. Run *connected‑components* on each mask frame.
-  2. Pick the blob closest to the image centre (most likely the rail in front).
-  3. Stateful logic:  
+  1. Pick the blob closest to the image centre (most likely the rail in front).
+  2. Stateful logic:  
      - **Enter** rail when a valid blob appears (`active_rail_ = true`).  
      - **Exit** when blob overlap drops below `min_overlap_px` *and* its centre shifts sideways (>100 px).  
-  4. On exit, if odometry shows the robot travelled ≥ `row_spacing`, increment and publish `rows_count`.
+  3. On exit, if odometry shows the robot travelled ≥ `row_spacing`, increment and publish `rows_count`.
 
 #### NEW APPROACH (work in progress)
 
