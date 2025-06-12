@@ -23,7 +23,7 @@ The repository also contains a `training` folder. This folder contains files and
     * [Q 1 – Row detection](#q-1--row-detection)
     * [Q 2 – Row counting](#q-2--row-counting)
     * [Q 3 – Testing & validation plan](#q-3--testing--validation-plan)
-* [Launch-file cheatsheet](#launch-file)
+* [Launch-file](#launch-file)
 
 ---
 
@@ -67,20 +67,55 @@ root/
 
 ## Prerequisites
 
-Tested on Ubuntu 24.04 + ROS 2 Jazzy
+Tested on:
+
+- Ubuntu 24.04 + ROS 2 Jazzy (recommended)
+- Also compatible with ROS 2 Iron and Humble
+
+> If `$ROS_DISTRO` is not defined, set it manually:
+> ```bash
+> export ROS_DISTRO=jazzy  # or humble, iron, etc.
+> ```
 
 ```bash
 sudo apt update && sudo apt install -y \
   build-essential cmake git curl \
-  ros-jazzy-desktop python3-colcon-common-extensions \
-  ros-jazzy-image-transport ros-jazzy-rqt-image-view \
-  ros-jazzy-cv-bridge ros-jazzy-ament-index-cpp \
-  ros-jazzy-rclcpp ros-jazzy-rclcpp-components \
-  ros-jazzy-sensor-msgs ros-jazzy-nav-msgs ros-jazzy-std-msgs \
-  libopencv-dev
+  python3-colcon-common-extensions \
+  libopencv-dev \
+  ros-$ROS_DISTRO-desktop \
+  ros-$ROS_DISTRO-rclcpp \
+  ros-$ROS_DISTRO-rclcpp-components \
+  ros-$ROS_DISTRO-cv-bridge \
+  ros-$ROS_DISTRO-image-transport \
+  ros-$ROS_DISTRO-sensor-msgs \
+  ros-$ROS_DISTRO-std-msgs \
+  ros-$ROS_DISTRO-nav-msgs \
+  ros-$ROS_DISTRO-rqt-image-view \
+  ros-$ROS_DISTRO-ament-cmake \
+  ros-$ROS_DISTRO-ament-index-cpp
+
 ```
 
+
 ### Install ONNX Runtime (required)
+
+**CPU‑only (quick):**
+
+```bash
+# For Ubuntu <= 22.04 (if available in your package manager)
+sudo apt install libonnxruntime-dev      
+```
+
+```bash
+# For Ubuntu ≥ 22.04 (or if the apt package is missing)
+git clone --recursive https://github.com/microsoft/onnxruntime
+cd onnxruntime
+./build.sh --config Release --update --parallel --build --skip_tests
+export ONNXRUNTIME_ROOT=$PWD
+```
+
+> If you're on Ubuntu 24.04, the `libonnxruntime-dev` package may not exist yet. Use the source build instead.
+
 
 **GPU build (optional but 5-10min):**
 
@@ -92,21 +127,20 @@ cd onnxruntime
            --skip_tests
 export ONNXRUNTIME_ROOT=$HOME/onnxruntime
 ```
+> Only set `ONNXRUNTIME_ROOT` if you built ONNX Runtime manually from source (e.g., for GPU support).
 
-**CPU‑only (quick):**
+---
 
-```bash
-sudo apt install libonnxruntime-dev       # small CPU‑only library
-```
-
-> Skip `--use_cuda` to compile a CPU‑only.
-```bash
-# ONNX Runtime 1.18+ with CUDA 12
-git clone --recursive https://github.com/microsoft/onnxruntime
-cd onnxruntime
-./build.sh --config Release --update --parallel --build --use_cuda --cuda_home /usr/local/cuda --cudnn_home /usr/local/cuda --skip_tests
-export ONNXRUNTIME_ROOT=$HOME/onnxruntime
-```
+> **Note on ONNXRUNTIME_ROOT**  
+> The CMake build expects ONNX Runtime to be located in:  
+> `${ONNXRUNTIME_ROOT}/build/Linux/Release`  
+> 
+> If you installed ONNX Runtime to a different location, either:
+> - Set `export ONNXRUNTIME_ROOT=/your/custom/path`
+> - Or update the `CMakeLists.txt` accordingly:
+>   ```cmake
+>   link_directories(/your/custom/path/build/Linux/Release)
+>   ```
 
 ---
 
@@ -114,8 +148,9 @@ export ONNXRUNTIME_ROOT=$HOME/onnxruntime
 
 ```bash
 mkdir -p ~/ros2_ws/src && cd ~/ros2_ws/src
-git clone https://github.com/kderoodt/viscon-assignment.git rail_detector
+git clone https://github.com/kderoodt/viscon-assignment.git
 cd ..
+export ONNXRUNTIME_ROOT=$HOME/onnxruntime    # only if you built from source
 colcon build --packages-select rail_detector
 source install/setup.bash
 ```
@@ -141,17 +176,13 @@ ros2 bag play ~/rosbags/viscon
 ros2 launch rail_detector rail_detector_launch.py     use_gpu:=false
 ```
 
-#### In a second terminal
-```bash
-# Play rosbag
-ros2 bag play ~/rosbags/viscon
-```
-
 ---
 
 ## Detailed solution per assignment question
 
 ### Q 1 – Row detection
+
+The `rail_detector_node` runs each incoming IR image through a pre-processing step (resize/contrast-enhance, etc.), feeds the cleaned frame to an ONNX segmentation model, thresholds the output to a binary rail mask, filters out small blobs, and publishes both the mask and a red overlay for visual debug. Parameters let you pick the model file, turn GPU support on/off, and set a minimum blob size. 
 
 #### Training/obtaining U-NET ONNX model
 
@@ -183,10 +214,13 @@ The `rail_detector_node` performs rail segmentation in a three-stage process:
 - Remove small noise blobs
 - Output binary mask + overlay image
 
+- **Inputs**
+  - `/d456_pole/infra1/image_rect_raw` `sensor_msgs/msg/Image` – mono8 image.
+
 **Published topics**
-- `/rail_detector/preprocessed` – Preprocessed mono8 image
-- `/rail_mask` – Binary rail segmentation
-- `/rail_detector/overlay` – Red overlay on image
+- `/rail_detector/preprocessed` – Preprocessed mono8 image.
+- `/rail_mask` – Binary rail segmentation.
+- `/rail_detector/overlay` – Red overlay on image.
 
 #### 📹 Demo video
 
@@ -199,19 +233,27 @@ https://github.com/user-attachments/assets/a0ca3169-3431-446a-8d1a-679908a3250b
 
 #### OLD APPROACH
 
-The `row_counter_node` implements a robust debounced row counter:
+The `row_counter_node` uses the binary rail-mask image stream, picks the rail blob closest to the centre of the view, and notes when the robot first “enters” that blob. Once the blob disappears or shifts sideways, it uses odometry to check that the robot has moved at least row_spacing metres; if so, it registers that a rail (row) has been passed and publishes the updated count:
 
-- Input: binary mask + `/odometry/filtered`
-- Filters:
-  - Ignore area < min_area_px
-  - Ignore rails where width > height
-  - Compare current pose with last counted rail
-- Increment count if distance ≥ row_spacing (0.5 m)
-- Debounce overlaps to avoid duplicates
+- **Inputs**
+  - `/rail_mask` `sensor_msgs/Image` – binary mask (white = rail pixels).
+  - `/odometry/filtered` `nav_msgs/Odometry` – robot pose.
 
-Publishes:
-- `/rows_count` (UInt32)
-- Console output with verbose detection details
+- **Published topics**
+  - `rows_count` `std_msgs/UInt32` – cumulative number of rails passed.
+
+- **Key Parameters**
+  - `row_spacing` (m, default **0.60**) – minimum travel before a new rail can be counted.
+  - `min_area_px` (default **1000**) – ignore blobs smaller than this.
+  - `min_overlap_px` (default **500**) – overlap threshold to decide we have left the current rail.
+
+- **Algorithm**
+  1. Run *connected‑components* on each mask frame.
+  2. Pick the blob closest to the image centre (most likely the rail in front).
+  3. Stateful logic:  
+     - **Enter** rail when a valid blob appears (`active_rail_ = true`).  
+     - **Exit** when blob overlap drops below `min_overlap_px` *and* its centre shifts sideways (>100 px).  
+  4. On exit, if odometry shows the robot travelled ≥ `row_spacing`, increment and publish `rows_count`.
 
 #### NEW APPROACH (work in progress)
 
