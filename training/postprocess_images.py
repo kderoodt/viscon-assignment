@@ -23,14 +23,12 @@ for image_tag in root.findall("image"):
     height = int(image_tag.attrib["height"])
     base_name = Path(filename).stem
 
-    # Load original image
     img_path = os.path.join(images_dir, filename)
     img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
     if img is None:
         print(f"Skipping missing image: {filename}")
         continue
 
-    # Create blank mask
     mask = np.zeros((height, width), dtype=np.uint8)
 
     for poly_tag in image_tag.findall("polyline"):

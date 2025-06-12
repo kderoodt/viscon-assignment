@@ -7,7 +7,6 @@ import shutil
 
 input_folder = "images_viscon"
 output_folder = "images_viscon_processed"
-save_as_npy = False
 
 clip_limit = 4.0
 tile_grid_size = (8, 8)
@@ -34,12 +33,9 @@ for filename in os.listdir(input_folder):
         img_norm = img_blur.astype(np.float32) / 255.0
 
         base_name = os.path.splitext(filename)[0]
-        if save_as_npy:
-            np.save(os.path.join(output_folder, base_name + ".npy"), img_norm)
-        else:
-            # Convert back to uint8 for saving as PNG (not ideal for training)
-            img_to_save = (img_norm * 255).astype(np.uint8)
-            cv2.imwrite(os.path.join(output_folder, base_name + ".png"), img_to_save)
+
+        img_to_save = (img_norm * 255).astype(np.uint8)
+        cv2.imwrite(os.path.join(output_folder, base_name + ".png"), img_to_save)
 
 print("All images processed and saved.")
 
